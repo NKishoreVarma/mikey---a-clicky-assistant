@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>LSUIElement</key>
+	<true/>
+	<key>VoiceTranscriptionProvider</key>
+	<string>assemblyai</string>
+	<key>WorkerBaseURL</key>
+	<string>https://your-worker-name.your-subdomain.workers.dev</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mikey uses your microphone so you can talk to it</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Mikey uses speech recognition to transcribe your voice when you talk to it</string>
+</dict>
+</plist>
