@@ -1,12 +1,18 @@
 /**
- * Clicky Proxy Worker
+ * Mikey Proxy Worker
  *
- * Proxies requests to Claude and ElevenLabs APIs so the app never
- * ships with raw API keys. Keys are stored as Cloudflare secrets.
+ * Proxies requests to Claude, ElevenLabs, and AssemblyAI APIs so the app
+ * never ships with raw API keys. Keys are stored as Cloudflare secrets.
+ *
+ * Authentication: every request must include the header:
+ *   Authorization: Bearer <MIKEY_AUTH_TOKEN>
+ * Set MIKEY_AUTH_TOKEN as a Cloudflare Worker secret. Set the same value
+ * as MikeyAuthToken in the app's Info.plist before building.
  *
  * Routes:
- *   POST /chat  → Anthropic Messages API (streaming)
- *   POST /tts   → ElevenLabs TTS API
+ *   POST /chat             → Anthropic Messages API (SSE streaming)
+ *   POST /tts              → ElevenLabs TTS API
+ *   POST /transcribe-token → AssemblyAI short-lived token
  */
 
 interface Env {
@@ -14,11 +20,20 @@ interface Env {
   ELEVENLABS_API_KEY: string;
   ELEVENLABS_VOICE_ID: string;
   ASSEMBLYAI_API_KEY: string;
+  MIKEY_AUTH_TOKEN: string;
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    // Validate shared secret on every request so only the Mikey app
+    // with the correct token in Info.plist can use this proxy.
+    const authHeader = request.headers.get("Authorization") ?? "";
+    const expectedToken = env.MIKEY_AUTH_TOKEN ?? "";
+    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+      return new Response("Unauthorized", { status: 401 });
+    }
 
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });

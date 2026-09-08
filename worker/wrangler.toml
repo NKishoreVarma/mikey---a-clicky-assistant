@@ -1,6 +1,8 @@
-name = "clicky-proxy"
+name = "mikey-proxy"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
+# ELEVENLABS_VOICE_ID: set this to your ElevenLabs voice ID.
+# Do NOT commit real values here — use `npx wrangler secret put` for secrets.
 [vars]
-ELEVENLABS_VOICE_ID = "kPzsL2i3teMYv0FxEYQ6"
+ELEVENLABS_VOICE_ID = "your-elevenlabs-voice-id"
