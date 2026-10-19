@@ -1,5 +1,5 @@
 //
-//  ClickyAnalytics.swift
+//  MikeyAnalytics.swift
 //  mikey
 //
 //  No-op analytics stub. All call sites from CompanionManager are preserved
@@ -9,7 +9,7 @@
 
 import Foundation
 
-enum ClickyAnalytics {
+enum MikeyAnalytics {
     static func configure() {}
     static func trackAppOpened() {}
     static func trackOnboardingStarted() {}

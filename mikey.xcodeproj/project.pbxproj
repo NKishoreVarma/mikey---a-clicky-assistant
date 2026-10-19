@@ -25,13 +25,26 @@
 
 /* Begin PBXFileReference section */
 		28F22CBF2F56440300A0FC59 /* Mikey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mikey.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		28F22CCC2F56440300A0FC59 /* mikeyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "mikeyTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		28F22CD62F56440300A0FC59 /* mikeyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "mikeyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		28F22CCC2F56440300A0FC59 /* mikeyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = mikeyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		28F22CD62F56440300A0FC59 /* mikeyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = mikeyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B9C74B9D3053EBAA00964AB1 /* Exceptions for "mikey" folder in "mikeyTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AssemblyAIStreamingTranscriptionProvider.swift,
+			);
+			target = 28F22CCB2F56440300A0FC59 /* mikeyTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		28F22CC12F56440300A0FC59 /* mikey */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B9C74B9D3053EBAA00964AB1 /* Exceptions for "mikey" folder in "mikeyTests" target */,
+			);
 			path = mikey;
 			sourceTree = "<group>";
 		};
@@ -394,7 +407,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "mikey/mikey.entitlements";
+				CODE_SIGN_ENTITLEMENTS = mikey/mikey.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -404,7 +417,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "mikey/Info.plist";
+				INFOPLIST_FILE = mikey/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Mikey;
 				INFOPLIST_KEY_CFBundleName = Mikey;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -414,7 +427,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mikey.app";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikey.app;
 				PRODUCT_NAME = Mikey;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -431,7 +444,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "mikey/mikey.entitlements";
+				CODE_SIGN_ENTITLEMENTS = mikey/mikey.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -441,7 +454,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "mikey/Info.plist";
+				INFOPLIST_FILE = mikey/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Mikey;
 				INFOPLIST_KEY_CFBundleName = Mikey;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -451,7 +464,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mikey.app";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikey.app;
 				PRODUCT_NAME = Mikey;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -472,7 +485,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mikey.app.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikey.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -492,7 +505,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mikey.app.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikey.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -510,7 +523,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mikey.app.uitests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikey.app.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -528,7 +541,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mikey.app.uitests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikey.app.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;

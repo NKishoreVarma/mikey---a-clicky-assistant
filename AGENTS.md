@@ -23,7 +23,7 @@ All API keys live on a Cloudflare Worker proxy — set `WorkerBaseURL` in `mikey
 - **Voice Input**: Push-to-talk via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
 - **Element Pointing**: Claude embeds `[POINT:x,y:label:screenN]` tags in responses. The overlay parses these, maps coordinates to the correct monitor, and animates the blue cursor along a bezier arc to the target.
 - **Concurrency**: `@MainActor` isolation, async/await throughout
-- **Analytics**: No-op stub in `ClickyAnalytics.swift` — wire your own if needed
+- **Analytics**: No-op stub in `MikeyAnalytics.swift` — wire your own if needed
 
 ### API Proxy (Cloudflare Worker)
 
@@ -74,7 +74,7 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | `OpenAIAPI.swift` | ~142 | OpenAI GPT vision API client. |
 | `ElevenLabsTTSClient.swift` | ~81 | ElevenLabs TTS client. Sends text to `{WorkerBaseURL}/tts`, plays back via AVAudioPlayer. |
 | `DesignSystem.swift` | ~880 | Design system tokens — colors, corner radii, shared styles. |
-| `ClickyAnalytics.swift` | ~28 | No-op analytics stub. All call sites compile unchanged. Wire your own analytics here. |
+| `MikeyAnalytics.swift` | ~28 | No-op analytics stub. All call sites compile unchanged. Wire your own analytics here. |
 | `WindowPositionManager.swift` | ~262 | Window placement, Screen Recording permission flow, accessibility permission helpers. |
 | `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader. Reads keys from Info.plist by name. |
 | `worker/src/index.ts` | ~142 | Cloudflare Worker proxy. Three routes: `/chat` (Claude SSE), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). |

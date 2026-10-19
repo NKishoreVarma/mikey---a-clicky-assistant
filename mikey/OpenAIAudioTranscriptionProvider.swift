@@ -73,7 +73,7 @@ private final class OpenAIAudioTranscriptionSession: BuddyStreamingTranscription
     private let onFinalTranscriptReady: (String) -> Void
     private let onError: (Error) -> Void
 
-    private let stateQueue = DispatchQueue(label: "com.learningbuddy.openai.transcription")
+    private let stateQueue = DispatchQueue(label: "com.mikey.app.openai.transcription")
     private let audioPCM16Converter = BuddyPCM16AudioConverter(
         targetSampleRate: Double(targetSampleRate)
     )
