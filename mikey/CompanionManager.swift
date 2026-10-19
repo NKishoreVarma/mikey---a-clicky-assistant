@@ -30,6 +30,7 @@ final class CompanionManager: ObservableObject {
     @Published private(set) var hasMicrophonePermission = false
     @Published private(set) var hasScreenContentPermission = false
 
+
     /// Screen location (global AppKit coords) of a detected UI element the
     /// buddy should fly to and point at. Parsed from Claude's response;
     /// observed by BlueCursorView to trigger the flight animation.
@@ -67,18 +68,19 @@ final class CompanionManager: ObservableObject {
     // Response text is now displayed inline on the cursor overlay via
     // streamingResponseText, so no separate response overlay manager is needed.
 
-    /// Base URL for the Cloudflare Worker proxy. All API requests route
-    /// through this so keys never ship in the app binary.
+    /// Base URL for the Cloudflare Worker proxy. Used only when MikeyLLMProvider
+    /// is "anthropic" or MikeyTTSProvider is "elevenlabs". In local mode (Ollama
+    /// + local TTS) this value is never sent over the network.
     /// Set the WorkerBaseURL key in Info.plist before building.
     private static let workerBaseURL = AppBundleConfiguration.stringValue(forKey: "WorkerBaseURL")
         ?? "https://your-worker-name.your-subdomain.workers.dev"
 
-    private lazy var claudeAPI: ClaudeAPI = {
-        return ClaudeAPI(proxyURL: "\(Self.workerBaseURL)/chat", model: selectedModel)
+    private lazy var llmProvider: any MikeyLLMProvider = {
+        return MikeyLLMProviderFactory.makeDefaultProvider()
     }()
 
-    private lazy var elevenLabsTTSClient: ElevenLabsTTSClient = {
-        return ElevenLabsTTSClient(proxyURL: "\(Self.workerBaseURL)/tts")
+    private lazy var ttsProvider: any MikeyTTSProvider = {
+        return MikeyTTSProviderFactory.makeDefaultProvider(workerBaseURL: Self.workerBaseURL)
     }()
 
     /// Conversation history so Claude remembers prior exchanges within a session.
@@ -114,19 +116,19 @@ final class CompanionManager: ObservableObject {
     func setSelectedModel(_ model: String) {
         selectedModel = model
         UserDefaults.standard.set(model, forKey: "selectedClaudeModel")
-        claudeAPI.model = model
+        llmProvider.model = model
     }
 
-    /// User preference for whether the Clicky cursor should be shown.
+    /// User preference for whether the Mikey cursor should be shown.
     /// When toggled off, the overlay is hidden and push-to-talk is disabled.
     /// Persisted to UserDefaults so the choice survives app restarts.
-    @Published var isClickyCursorEnabled: Bool = UserDefaults.standard.object(forKey: "isClickyCursorEnabled") == nil
+    @Published var isMikeyCursorEnabled: Bool = UserDefaults.standard.object(forKey: "isMikeyCursorEnabled") == nil
         ? true
-        : UserDefaults.standard.bool(forKey: "isClickyCursorEnabled")
+        : UserDefaults.standard.bool(forKey: "isMikeyCursorEnabled")
 
-    func setClickyCursorEnabled(_ enabled: Bool) {
-        isClickyCursorEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "isClickyCursorEnabled")
+    func setMikeyCursorEnabled(_ enabled: Bool) {
+        isMikeyCursorEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "isMikeyCursorEnabled")
         transientHideTask?.cancel()
         transientHideTask = nil
 
@@ -155,22 +157,36 @@ final class CompanionManager: ObservableObject {
         // No-op for local-first single-user deployment.
     }
 
+    // MARK: - Initialization
+
+    init() {
+        // Migrate legacy UserDefaults keys from the original Clicky/learningbuddy
+        // codebase before the first permission read so the new keys are populated.
+        MikeyPermissionService.migrateLegacyUserDefaultsKeys()
+
+        // Resolve all synchronous permission states immediately. This guarantees
+        // that allPermissionsGranted is correct BEFORE the first SwiftUI render and
+        // before start() is called, preventing any stale-false initial state from
+        // briefly showing the permission panel to users who already granted everything.
+        refreshAllPermissions()
+    }
+
     func start() {
         refreshAllPermissions()
-        print("🔑 Clicky start — accessibility: \(hasAccessibilityPermission), screen: \(hasScreenRecordingPermission), mic: \(hasMicrophonePermission), screenContent: \(hasScreenContentPermission), onboarded: \(hasCompletedOnboarding)")
+        print("🔑 Mikey start — accessibility: \(hasAccessibilityPermission), screen: \(hasScreenRecordingPermission), mic: \(hasMicrophonePermission), screenContent: \(hasScreenContentPermission), onboarded: \(hasCompletedOnboarding)")
         startPermissionPolling()
         bindVoiceStateObservation()
         bindAudioPowerLevel()
         bindShortcutTransitions()
-        // Eagerly touch the Claude API so its TLS warmup handshake completes
-        // well before the onboarding demo fires at ~40s into the video.
-        _ = claudeAPI
+        // Eagerly initialize the LLM provider so any TLS warmup or setup
+        // completes well before the onboarding demo fires at ~40s into the video.
+        _ = llmProvider
 
         // If the user already completed onboarding AND all permissions are
         // still granted, show the cursor overlay immediately. If permissions
         // were revoked (e.g. signing change), don't show the cursor — the
         // panel will show the permissions UI instead.
-        if hasCompletedOnboarding && allPermissionsGranted && isClickyCursorEnabled {
+        if hasCompletedOnboarding && allPermissionsGranted && isMikeyCursorEnabled {
             overlayWindowManager.hasShownOverlayBefore = true
             overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
             isOverlayVisible = true
@@ -183,13 +199,13 @@ final class CompanionManager: ObservableObject {
     /// the overlay so the welcome animation and intro video play.
     func triggerOnboarding() {
         // Post notification so the panel manager can dismiss the panel
-        NotificationCenter.default.post(name: .clickyDismissPanel, object: nil)
+        NotificationCenter.default.post(name: .mikeyDismissPanel, object: nil)
 
         // Mark onboarding as completed so the Start button won't appear
         // again on future launches — the cursor will auto-show instead
         hasCompletedOnboarding = true
 
-        ClickyAnalytics.trackOnboardingStarted()
+        MikeyAnalytics.trackOnboardingStarted()
 
         // Play Besaid theme at 60% volume, fade out after 1m 30s
         startOnboardingMusic()
@@ -204,8 +220,8 @@ final class CompanionManager: ObservableObject {
     /// footer link. Same flow as triggerOnboarding but the cursor overlay
     /// is already visible so we just restart the welcome animation and video.
     func replayOnboarding() {
-        NotificationCenter.default.post(name: .clickyDismissPanel, object: nil)
-        ClickyAnalytics.trackOnboardingReplayed()
+        NotificationCenter.default.post(name: .mikeyDismissPanel, object: nil)
+        MikeyAnalytics.trackOnboardingReplayed()
         startOnboardingMusic()
         // Tear down any existing overlays and recreate with isFirstAppearance = true
         overlayWindowManager.hasShownOverlayBefore = false
@@ -223,7 +239,7 @@ final class CompanionManager: ObservableObject {
     private func startOnboardingMusic() {
         stopOnboardingMusic()
         guard let musicURL = Bundle.main.url(forResource: "ff", withExtension: "mp3") else {
-            print("⚠️ Clicky: ff.mp3 not found in bundle")
+            print("⚠️ Mikey: ff.mp3 not found in bundle")
             return
         }
 
@@ -238,7 +254,7 @@ final class CompanionManager: ObservableObject {
                 self?.fadeOutOnboardingMusic()
             }
         } catch {
-            print("⚠️ Clicky: Failed to play onboarding music: \(error)")
+            print("⚠️ Mikey: Failed to play onboarding music: \(error)")
         }
     }
 
@@ -286,50 +302,54 @@ final class CompanionManager: ObservableObject {
     }
 
     func refreshAllPermissions() {
+        let previouslyHadAll = allPermissionsGranted
         let previouslyHadAccessibility = hasAccessibilityPermission
         let previouslyHadScreenRecording = hasScreenRecordingPermission
         let previouslyHadMicrophone = hasMicrophonePermission
-        let previouslyHadAll = allPermissionsGranted
+        let previouslyHadScreenContent = hasScreenContentPermission
 
-        let currentlyHasAccessibility = WindowPositionManager.hasAccessibilityPermission()
-        hasAccessibilityPermission = currentlyHasAccessibility
+        // Read authoritative state from MikeyPermissionService — the single source
+        // of truth for all four permissions.
+        let snapshot = MikeyPermissionService.currentSnapshot()
 
-        if currentlyHasAccessibility {
+        hasAccessibilityPermission = snapshot.accessibility == .granted
+        hasScreenRecordingPermission = snapshot.screenRecording == .granted
+        hasMicrophonePermission = snapshot.microphone == .granted
+
+        // Screen content: once confirmed (.granted), never downgrade via polling.
+        // A genuine revocation is detected when the UserDefaults cache is absent AND
+        // the next requestScreenContentPermission() call fails.
+        if snapshot.screenContent == .granted || !hasScreenContentPermission {
+            hasScreenContentPermission = snapshot.screenContent == .granted
+        }
+
+        // Start/stop the global shortcut tap based on actual accessibility state.
+        if hasAccessibilityPermission {
             globalPushToTalkShortcutMonitor.start()
         } else {
             globalPushToTalkShortcutMonitor.stop()
         }
 
-        hasScreenRecordingPermission = WindowPositionManager.hasScreenRecordingPermission()
-
-        let micAuthStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        hasMicrophonePermission = micAuthStatus == .authorized
-
-        // Debug: log permission state on changes
+        // Log state transitions (not every poll to keep logs clean)
         if previouslyHadAccessibility != hasAccessibilityPermission
             || previouslyHadScreenRecording != hasScreenRecordingPermission
-            || previouslyHadMicrophone != hasMicrophonePermission {
-            print("🔑 Permissions — accessibility: \(hasAccessibilityPermission), screen: \(hasScreenRecordingPermission), mic: \(hasMicrophonePermission), screenContent: \(hasScreenContentPermission)")
+            || previouslyHadMicrophone != hasMicrophonePermission
+            || previouslyHadScreenContent != hasScreenContentPermission {
+            print("🔑 Permissions — accessibility: \(hasAccessibilityPermission), screenRecording: \(hasScreenRecordingPermission), mic: \(hasMicrophonePermission), screenContent: \(hasScreenContentPermission)")
         }
 
-        // Track individual permission grants as they happen
+        // Analytics: fire once per grant event
         if !previouslyHadAccessibility && hasAccessibilityPermission {
-            ClickyAnalytics.trackPermissionGranted(permission: "accessibility")
+            MikeyAnalytics.trackPermissionGranted(permission: "accessibility")
         }
         if !previouslyHadScreenRecording && hasScreenRecordingPermission {
-            ClickyAnalytics.trackPermissionGranted(permission: "screen_recording")
+            MikeyAnalytics.trackPermissionGranted(permission: "screen_recording")
         }
         if !previouslyHadMicrophone && hasMicrophonePermission {
-            ClickyAnalytics.trackPermissionGranted(permission: "microphone")
+            MikeyAnalytics.trackPermissionGranted(permission: "microphone")
         }
-        // Screen content permission is persisted — once the user has approved the
-        // SCShareableContent picker, we don't need to re-check it.
-        if !hasScreenContentPermission {
-            hasScreenContentPermission = UserDefaults.standard.bool(forKey: "hasScreenContentPermission")
-        }
-
         if !previouslyHadAll && allPermissionsGranted {
-            ClickyAnalytics.trackAllPermissionsGranted()
+            MikeyAnalytics.trackAllPermissionsGranted()
         }
     }
 
@@ -342,38 +362,26 @@ final class CompanionManager: ObservableObject {
         guard !isRequestingScreenContent else { return }
         isRequestingScreenContent = true
         Task {
-            do {
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                guard let display = content.displays.first else {
-                    await MainActor.run { isRequestingScreenContent = false }
-                    return
-                }
-                let filter = SCContentFilter(display: display, excludingWindows: [])
-                let config = SCStreamConfiguration()
-                config.width = 320
-                config.height = 240
-                let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
-                // Verify the capture actually returned real content — a 0x0 or
-                // fully-empty image means the user denied the prompt.
-                let didCapture = image.width > 0 && image.height > 0
-                print("🔑 Screen content capture result — width: \(image.width), height: \(image.height), didCapture: \(didCapture)")
-                await MainActor.run {
-                    isRequestingScreenContent = false
-                    guard didCapture else { return }
-                    hasScreenContentPermission = true
-                    UserDefaults.standard.set(true, forKey: "hasScreenContentPermission")
-                    ClickyAnalytics.trackPermissionGranted(permission: "screen_content")
+            // Delegate to MikeyPermissionService — the single source of truth.
+            // The service writes the UserDefaults cache on success.
+            let didCapture = await MikeyPermissionService.requestScreenContentPermission()
+            print("🔑 Screen content capture result — didCapture: \(didCapture)")
 
-                    // If onboarding was already completed, show the cursor overlay now
-                    if hasCompletedOnboarding && allPermissionsGranted && !isOverlayVisible && isClickyCursorEnabled {
-                        overlayWindowManager.hasShownOverlayBefore = true
-                        overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
-                        isOverlayVisible = true
-                    }
-                }
-            } catch {
-                print("⚠️ Screen content permission request failed: \(error)")
-                await MainActor.run { isRequestingScreenContent = false }
+            isRequestingScreenContent = false
+            guard didCapture else { return }
+
+            let wasAllGrantedBefore = allPermissionsGranted
+            hasScreenContentPermission = true
+            MikeyAnalytics.trackPermissionGranted(permission: "screen_content")
+            if !wasAllGrantedBefore && allPermissionsGranted {
+                MikeyAnalytics.trackAllPermissionsGranted()
+            }
+
+            // Show the cursor overlay if onboarding is done and all permissions now granted
+            if hasCompletedOnboarding && allPermissionsGranted && !isOverlayVisible && isMikeyCursorEnabled {
+                overlayWindowManager.hasShownOverlayBefore = true
+                overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
+                isOverlayVisible = true
             }
         }
     }
@@ -465,18 +473,18 @@ final class CompanionManager: ObservableObject {
             transientHideTask = nil
 
             // If the cursor is hidden, bring it back transiently for this interaction
-            if !isClickyCursorEnabled && !isOverlayVisible {
+            if !isMikeyCursorEnabled && !isOverlayVisible {
                 overlayWindowManager.hasShownOverlayBefore = true
                 overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
                 isOverlayVisible = true
             }
 
             // Dismiss the menu bar panel so it doesn't cover the screen
-            NotificationCenter.default.post(name: .clickyDismissPanel, object: nil)
+            NotificationCenter.default.post(name: .mikeyDismissPanel, object: nil)
 
             // Cancel any in-progress response and TTS from a previous utterance
             currentResponseTask?.cancel()
-            elevenLabsTTSClient.stopPlayback()
+            ttsProvider.stopPlayback()
             clearDetectedElementLocation()
 
             // Dismiss the onboarding prompt if it's showing
@@ -491,7 +499,7 @@ final class CompanionManager: ObservableObject {
             }
     
 
-            ClickyAnalytics.trackPushToTalkStarted()
+            MikeyAnalytics.trackPushToTalkStarted()
 
             pendingKeyboardShortcutStartTask?.cancel()
             pendingKeyboardShortcutStartTask = Task {
@@ -503,7 +511,7 @@ final class CompanionManager: ObservableObject {
                     submitDraftText: { [weak self] finalTranscript in
                         self?.lastTranscript = finalTranscript
                         print("🗣️ Companion received transcript: \(finalTranscript)")
-                        ClickyAnalytics.trackUserMessageSent(transcript: finalTranscript)
+                        MikeyAnalytics.trackUserMessageSent(transcript: finalTranscript)
                         self?.sendTranscriptToClaudeWithScreenshot(transcript: finalTranscript)
                     }
                 )
@@ -513,7 +521,7 @@ final class CompanionManager: ObservableObject {
             // before the async startPushToTalk had a chance to begin recording.
             // Without this, a quick press-and-release drops the release event and
             // leaves the waveform overlay stuck on screen indefinitely.
-            ClickyAnalytics.trackPushToTalkReleased()
+            MikeyAnalytics.trackPushToTalkReleased()
             pendingKeyboardShortcutStartTask?.cancel()
             pendingKeyboardShortcutStartTask = nil
             buddyDictationManager.stopPushToTalkFromKeyboardShortcut()
@@ -568,11 +576,14 @@ final class CompanionManager: ObservableObject {
     /// the buddy to fly to that element on screen.
     private func sendTranscriptToClaudeWithScreenshot(transcript: String) {
         currentResponseTask?.cancel()
-        elevenLabsTTSClient.stopPlayback()
+        ttsProvider.stopPlayback()
 
         currentResponseTask = Task {
             // Stay in processing (spinner) state — no streaming text displayed
             voiceState = .processing
+
+            print("🤖 LLM provider: \(type(of: llmProvider))")
+            print("🔊 TTS provider: \(type(of: ttsProvider))")
 
             do {
                 // Capture all connected screens so the AI has full context
@@ -593,7 +604,7 @@ final class CompanionManager: ObservableObject {
                     (userPlaceholder: entry.userTranscript, assistantResponse: entry.assistantResponse)
                 }
 
-                let (fullResponseText, _) = try await claudeAPI.analyzeImageStreaming(
+                let (fullResponseText, _) = try await llmProvider.analyzeImageStreaming(
                     images: labeledImages,
                     systemPrompt: Self.companionVoiceResponseSystemPrompt,
                     conversationHistory: historyForAPI,
@@ -658,7 +669,7 @@ final class CompanionManager: ObservableObject {
 
                     detectedElementScreenLocation = globalLocation
                     detectedElementDisplayFrame = displayFrame
-                    ClickyAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
+                    MikeyAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
                     print("🎯 Element pointing: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(parseResult.elementLabel ?? "element")\"")
                 } else {
                     print("🎯 Element pointing: \(parseResult.elementLabel ?? "no element")")
@@ -678,27 +689,27 @@ final class CompanionManager: ObservableObject {
 
                 print("🧠 Conversation history: \(conversationHistory.count) exchanges")
 
-                ClickyAnalytics.trackAIResponseReceived(response: spokenText)
+                MikeyAnalytics.trackAIResponseReceived(response: spokenText)
 
                 // Play the response via TTS. Keep the spinner (processing state)
                 // until the audio actually starts playing, then switch to responding.
                 if !spokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     do {
-                        try await elevenLabsTTSClient.speakText(spokenText)
-                        // speakText returns after player.play() — audio is now playing
+                        try await ttsProvider.speakText(spokenText)
+                        // speakText returns after playback starts — audio is now playing
                         voiceState = .responding
                     } catch {
-                        ClickyAnalytics.trackTTSError(error: error.localizedDescription)
-                        print("⚠️ ElevenLabs TTS error: \(error)")
+                        MikeyAnalytics.trackTTSError(error: error.localizedDescription)
+                        print("⚠️ TTS error: \(error)")
                         speakCreditsErrorFallback()
                     }
                 }
             } catch is CancellationError {
                 // User spoke again — response was interrupted
             } catch {
-                ClickyAnalytics.trackResponseError(error: error.localizedDescription)
-                print("⚠️ Companion response error: \(error)")
-                speakCreditsErrorFallback()
+                MikeyAnalytics.trackResponseError(error: error.localizedDescription)
+                print("⚠️ LLM error [\(type(of: llmProvider))]: \(error)")
+                speakLLMErrorFallback()
             }
 
             if !Task.isCancelled {
@@ -708,17 +719,17 @@ final class CompanionManager: ObservableObject {
         }
     }
 
-    /// If the cursor is in transient mode (user toggled "Show Clicky" off),
+    /// If the cursor is in transient mode (user toggled "Show Mikey" off),
     /// waits for TTS playback and any pointing animation to finish, then
     /// fades out the overlay after a 1-second pause. Cancelled automatically
     /// if the user starts another push-to-talk interaction.
     private func scheduleTransientHideIfNeeded() {
-        guard !isClickyCursorEnabled && isOverlayVisible else { return }
+        guard !isMikeyCursorEnabled && isOverlayVisible else { return }
 
         transientHideTask?.cancel()
         transientHideTask = Task {
             // Wait for TTS audio to finish playing
-            while elevenLabsTTSClient.isPlaying {
+            while ttsProvider.isPlaying {
                 try? await Task.sleep(nanoseconds: 200_000_000)
                 guard !Task.isCancelled else { return }
             }
@@ -738,12 +749,25 @@ final class CompanionManager: ObservableObject {
         }
     }
 
-    /// Speaks a fallback error message via macOS system TTS when the worker
-    /// or ElevenLabs is unreachable. Works without any external dependencies.
-    private func speakCreditsErrorFallback() {
-        let utterance = "Sorry, I can't reach the server right now. Check your worker URL in Info.plist."
+    /// Speaks a provider-appropriate error message via macOS system TTS.
+    /// Used when the LLM provider is unreachable. Works without any external dependencies.
+    private func speakLLMErrorFallback() {
+        let utterance: String
+        if llmProvider is OllamaLLMProvider {
+            utterance = "Ollama is unavailable. Make sure Ollama is running on localhost."
+        } else {
+            utterance = "I can't reach the AI provider right now. Check the console for details."
+        }
         let synthesizer = NSSpeechSynthesizer()
         synthesizer.startSpeaking(utterance)
+        voiceState = .responding
+    }
+
+    /// Speaks a generic error message via macOS system TTS when TTS itself fails.
+    /// Works without any external dependencies.
+    private func speakCreditsErrorFallback() {
+        let synthesizer = NSSpeechSynthesizer()
+        synthesizer.startSpeaking("Sorry, something went wrong with audio playback.")
         voiceState = .responding
     }
 
@@ -831,13 +855,13 @@ final class CompanionManager: ObservableObject {
         }
 
         // At 40 seconds into the video, trigger the onboarding demo where
-        // Clicky flies to something interesting on screen and comments on it
+        // Mikey flies to something interesting on screen and comments on it
         let demoTriggerTime = CMTime(seconds: 40, preferredTimescale: 600)
         onboardingDemoTimeObserver = player.addBoundaryTimeObserver(
             forTimes: [NSValue(time: demoTriggerTime)],
             queue: .main
         ) { [weak self] in
-            ClickyAnalytics.trackOnboardingDemoTriggered()
+            MikeyAnalytics.trackOnboardingDemoTriggered()
             self?.performOnboardingDemoInteraction()
         }
 
@@ -848,7 +872,7 @@ final class CompanionManager: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             guard let self else { return }
-            ClickyAnalytics.trackOnboardingVideoCompleted()
+            MikeyAnalytics.trackOnboardingVideoCompleted()
             self.onboardingVideoOpacity = 0.0
             // Wait for the 2s fade-out animation to complete before tearing down
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
@@ -964,9 +988,10 @@ final class CompanionManager: ObservableObject {
                 let dimensionInfo = " (image dimensions: \(cursorScreenCapture.screenshotWidthInPixels)x\(cursorScreenCapture.screenshotHeightInPixels) pixels)"
                 let labeledImages = [(data: cursorScreenCapture.imageData, label: cursorScreenCapture.label + dimensionInfo)]
 
-                let (fullResponseText, _) = try await claudeAPI.analyzeImageStreaming(
+                let (fullResponseText, _) = try await llmProvider.analyzeImageStreaming(
                     images: labeledImages,
                     systemPrompt: Self.onboardingDemoSystemPrompt,
+                    conversationHistory: [],
                     userPrompt: "look around my screen and find something interesting to point at",
                     onTextChunk: { _ in }
                 )

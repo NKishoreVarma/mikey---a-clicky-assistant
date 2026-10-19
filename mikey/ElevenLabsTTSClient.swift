@@ -14,6 +14,8 @@ import Foundation
 final class ElevenLabsTTSClient {
     private let proxyURL: URL
     private let session: URLSession
+    /// Bearer token sent on every request so the proxy rejects unauthorized callers.
+    private let authToken: String
 
     /// The audio player for the current TTS playback. Kept alive so the
     /// audio finishes playing even if the caller doesn't hold a reference.
@@ -21,6 +23,7 @@ final class ElevenLabsTTSClient {
 
     init(proxyURL: String) {
         self.proxyURL = URL(string: proxyURL)!
+        self.authToken = AppBundleConfiguration.stringValue(forKey: "MikeyAuthToken") ?? ""
 
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
@@ -35,6 +38,7 @@ final class ElevenLabsTTSClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
 
         let body: [String: Any] = [
             "text": text,
@@ -79,3 +83,9 @@ final class ElevenLabsTTSClient {
         audioPlayer = nil
     }
 }
+
+// ElevenLabsTTSClient already provides all MikeyTTSProvider requirements:
+//   func speakText(_:) async throws  ✓
+//   var isPlaying: Bool  ✓
+//   func stopPlayback()  ✓
+extension ElevenLabsTTSClient: MikeyTTSProvider {}

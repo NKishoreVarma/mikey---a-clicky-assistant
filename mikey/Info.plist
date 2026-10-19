@@ -4,10 +4,44 @@
 <dict>
 	<key>LSUIElement</key>
 	<true/>
+
+	<!-- ── LLM Provider ───────────────────────────────────────────────────── -->
+	<!-- "ollama"     → OllamaLLMProvider (local, free, no API key)           -->
+	<!-- "anthropic"  → ClaudeAPI via Cloudflare Worker (requires WorkerBaseURL + key) -->
+	<key>MikeyLLMProvider</key>
+	<string>ollama</string>
+
+	<!-- Ollama base URL. Ollama must be running locally. -->
+	<key>MikeyOllamaURL</key>
+	<string>http://localhost:11434</string>
+
+	<!-- Ollama model name. Use a vision-capable model for screen context.    -->
+	<!-- Currently installed (text-only): qwen2.5-coder:7b, qwen-64k:latest  -->
+	<!-- For vision support run: ollama pull llava  then change to "llava"   -->
+	<key>MikeyOllamaModel</key>
+	<string>qwen2.5-coder:7b</string>
+
+	<!-- ── TTS Provider ───────────────────────────────────────────────────── -->
+	<!-- "local"       → LocalMacOSTTSProvider / AVSpeechSynthesizer (free)  -->
+	<!-- "elevenlabs"  → ElevenLabsTTSClient via Cloudflare Worker            -->
+	<key>MikeyTTSProvider</key>
+	<string>local</string>
+
+	<!-- ── Voice Transcription Provider ──────────────────────────────────── -->
+	<!-- "apple"       → AppleSpeechTranscriptionProvider (free, local)      -->
+	<!-- "assemblyai"  → AssemblyAI websocket (requires WorkerBaseURL + key) -->
+	<!-- "openai"      → OpenAI Whisper upload (requires OpenAI key)         -->
 	<key>VoiceTranscriptionProvider</key>
-	<string>assemblyai</string>
+	<string>apple</string>
+
+	<!-- ── Worker / Anthropic (not required for local mode) ──────────────── -->
+	<!-- Update when deploying the Cloudflare Worker for production.         -->
 	<key>WorkerBaseURL</key>
 	<string>https://your-worker-name.your-subdomain.workers.dev</string>
+	<key>MikeyAuthToken</key>
+	<string>your-mikey-auth-token</string>
+
+	<!-- ── macOS Permission Strings ──────────────────────────────────────── -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Mikey uses your microphone so you can talk to it</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

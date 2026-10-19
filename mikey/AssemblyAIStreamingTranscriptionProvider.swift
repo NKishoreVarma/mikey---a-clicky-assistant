@@ -66,6 +66,8 @@ final class AssemblyAIStreamingTranscriptionProvider: BuddyTranscriptionProvider
     private func fetchTemporaryToken() async throws -> String {
         var request = URLRequest(url: URL(string: Self.tokenProxyURL)!)
         request.httpMethod = "POST"
+        let authToken = AppBundleConfiguration.stringValue(forKey: "MikeyAuthToken") ?? ""
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -126,8 +128,8 @@ private final class AssemblyAIStreamingTranscriptionSession: NSObject, BuddyStre
     private let onFinalTranscriptReady: (String) -> Void
     private let onError: (Error) -> Void
 
-    private let stateQueue = DispatchQueue(label: "com.learningbuddy.assemblyai.state")
-    private let sendQueue = DispatchQueue(label: "com.learningbuddy.assemblyai.send")
+    private let stateQueue = DispatchQueue(label: "com.mikey.app.assemblyai.state")
+    private let sendQueue = DispatchQueue(label: "com.mikey.app.assemblyai.send")
     private let audioPCM16Converter = BuddyPCM16AudioConverter(targetSampleRate: targetSampleRate)
     private let urlSession: URLSession
 

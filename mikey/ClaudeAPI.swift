@@ -13,8 +13,11 @@ class ClaudeAPI {
     private let apiURL: URL
     var model: String
     private let session: URLSession
+    /// Bearer token sent on every request so the proxy rejects unauthorized callers.
+    private let authToken: String
 
     init(proxyURL: String, model: String = "claude-sonnet-4-6") {
+        self.authToken = AppBundleConfiguration.stringValue(forKey: "MikeyAuthToken") ?? ""
         self.apiURL = URL(string: proxyURL)!
         self.model = model
 
@@ -41,6 +44,7 @@ class ClaudeAPI {
         request.httpMethod = "POST"
         request.timeoutInterval = 120
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         return request
     }
 
@@ -211,6 +215,8 @@ class ClaudeAPI {
         return (text: accumulatedResponseText, duration: duration)
     }
 
+    // MARK: - MikeyLLMProvider conformance declared in extension below
+
     /// Non-streaming fallback for validation requests where we don't need progressive display.
     func analyzeImage(
         images: [(data: Data, label: String)],
@@ -289,3 +295,8 @@ class ClaudeAPI {
         return (text: text, duration: duration)
     }
 }
+
+// ClaudeAPI already provides all MikeyLLMProvider requirements:
+//   var model: String  ✓
+//   func analyzeImageStreaming(...)  ✓
+extension ClaudeAPI: MikeyLLMProvider {}
