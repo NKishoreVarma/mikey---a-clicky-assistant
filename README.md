@@ -1,162 +1,161 @@
-Update: April 27, 2026.
+# Mikey — Intelligent macOS Companion & Cursor Assistant
 
-Hi there! I'm Farza, the guy that made Clicky.
+[![macOS](https://img.shields.io/badge/macOS-14.2%2B-black?logo=apple)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange?logo=swift)](https://swift.org/)
+[![SwiftUI](https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-blue)](https://developer.apple.com/xcode/swiftui/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Architecture](https://img.shields.io/badge/Architecture-Local%20%7C%20Cloud%20Hybrid-brightgreen)](#architecture)
 
-The existing codebase remains open source. Tinker with it, make it yours, start a company out of it, do whatever you want I don't mind. But, for all the new stuff I'm hacking on, gonna keep it private. To get the latest Clicky, you can go [here](https://www.heyclicky.com/).
+Mikey is a native macOS companion app that lives in your menu bar and right alongside your cursor. By holding the push-to-talk hotkey (`Ctrl + Option`), Mikey captures your voice, takes a high-resolution screenshot of your active screen, and provides intelligent, contextual multimodal answers. Mikey can speak aloud with realistic voice synthesis, stream real-time text responses in a floating companion bubble, and fly to/point at referenced UI elements across multiple displays with smooth bezier animations.
 
-I also tweeted about this [here](https://x.com/FarzaTV/status/2043402737828962489).
+> **Local-First & Cloud-Ready**: Mikey supports both 100% offline local AI (Ollama + Apple Speech + macOS TTS) with zero external API keys, as well as high-performance cloud providers (Anthropic Claude 3.7/Sonnet + AssemblyAI streaming + ElevenLabs) via an optional Cloudflare Worker proxy.
 
-Go crazy with this repo!! It's an MIT license.
+---
 
-# Hi, this is Clicky.
-It's an AI teacher that lives as a buddy next to your cursor. It can see your screen, talk to you, and even point at stuff. Kinda like having a real teacher next to you.
+## Key Highlights
 
-Download it [here](https://www.clicky.so/) for free.
+- **Menu Bar LifeCycle (`LSUIElement`)**: No dock clutter, no heavy windows. Lives discreetly in your macOS status bar.
+- **Transparent Cursor Companion Overlay**: Renders stateful animations, speech waveforms, streaming markdown text responses, and a glowing directional cursor pointer.
+- **Bezier-Arc Element Pointing**: When vision models identify relevant on-screen elements via `[POINT:x,y:label:screenN]` coordinates, Mikey flies smoothly to point directly at them across any connected monitor.
+- **Pluggable Architecture**:
+  - **LLM Engine (`MikeyLLMProvider`)**: Local Ollama (e.g. `llava`, `llama3.2-vision`) or Anthropic Claude (Sonnet 4.6, Opus 4.6).
+  - **Text-to-Speech (`MikeyTTSProvider`)**: Instant offline macOS `AVSpeechSynthesizer` or ultra-realistic ElevenLabs.
+  - **Speech-to-Text (`BuddyTranscriptionProvider`)**: Built-in Apple Speech (offline), AssemblyAI real-time WebSocket, or OpenAI Whisper.
+- **Low-Latency Push-to-Talk**: Global `Ctrl + Option` detection using a listen-only `CGEvent` tap without stealing keyboard focus from active apps.
+- **Robust TCC Permissions Service (`MikeyPermissionService`)**: Centralized manager for Microphone, Accessibility, Screen Recording, and ScreenCaptureKit permissions with persistent caching to eliminate macOS rebuild false-negatives.
 
-Here's the [original tweet](https://x.com/FarzaTV/status/2041314633978659092) that kinda blew up for a demo for more context.
+---
 
-![Clicky — an ai buddy that lives on your mac](clicky-demo.gif)
-
-This is the open-source version of Clicky for those that want to hack on it, build their own features, or just see how it works under the hood.
-
-## Get started with Claude Code
-
-The fastest way to get this running is with [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
-
-Once you get Claude running, paste this:
+## System Architecture
 
 ```
-Hi Claude.
-
-Clone https://github.com/farzaa/clicky.git into my current directory.
-
-Then read the CLAUDE.md. I want to get Clicky running locally on my Mac.
-
-Help me set up everything — the Cloudflare Worker with my own API keys, the proxy URLs, and getting it building in Xcode. Walk me through it.
+                                  ┌───────────────────────────────┐
+                                  │   macOS Menu Bar (StatusItem) │
+                                  └──────────────┬────────────────┘
+                                                 │
+                                     ┌───────────▼───────────┐
+                                     │  CompanionManager     │
+                                     │  (Central Controller) │
+                                     └─────┬─────┬─────┬─────┘
+                     ┌─────────────────────┘     │     └─────────────────────┐
+                     ▼                           ▼                           ▼
+        ┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐
+        │   MikeyLLMProvider      │ │    MikeyTTSProvider     │ │  TranscriptionProvider  │
+        ├─────────────────────────┤ ├─────────────────────────┤ ├─────────────────────────┤
+        │ • Ollama (Local/Offline)│ │ • macOS AVSpeech (Local)│ │ • Apple Speech (Local)  │
+        │ • Claude (via Worker)   │ │ • ElevenLabs (via Worker│ │ • AssemblyAI WebSocket  │
+        │                         │ │                         │ │ • OpenAI Whisper        │
+        └─────────────────────────┘ └─────────────────────────┘ └─────────────────────────┘
+                     │                           │                           │
+                     └─────────────────────┬─────┴───────────────────────────┘
+                                           │
+                               ┌───────────▼───────────┐
+                               │     OverlayWindow     │
+                               │  (Transparent NSPanel)│
+                               │  • Streaming Bubble   │
+                               │  • Waveform Visualizer│
+                               │  • Multi-Screen Arc   │
+                               └───────────────────────┘
 ```
 
-That's it. It'll clone the repo, read the docs, and walk you through the whole setup. Once you're running you can just keep talking to it — build features, fix bugs, whatever. Go crazy.
+---
 
-## Manual setup
-
-If you want to do it yourself, here's the deal.
+## Getting Started
 
 ### Prerequisites
 
-- macOS 14.2+ (for ScreenCaptureKit)
-- Xcode 15+
-- Node.js 18+ (for the Cloudflare Worker)
-- A [Cloudflare](https://cloudflare.com) account (free tier works)
-- API keys for: [Anthropic](https://console.anthropic.com), [AssemblyAI](https://www.assemblyai.com), [ElevenLabs](https://elevenlabs.io)
+- **macOS Sonoma 14.2+** (required for modern `ScreenCaptureKit` and multi-monitor APIs)
+- **Xcode 15.0+**
+- *(Optional for Local Mode)*: [Ollama](https://ollama.com/) installed and running locally
+- *(Optional for Cloud Mode)*: Node.js 18+ and a Cloudflare account for the proxy worker
 
-### 1. Set up the Cloudflare Worker
+---
 
-The Worker is a tiny proxy that holds your API keys. The app talks to the Worker, the Worker talks to the APIs. This way your keys never ship in the app binary.
+### Quick Start: Local-First Mode (100% Free, Zero API Keys)
 
-```bash
-cd worker
-npm install
-```
+Mikey is configured out-of-the-box to run entirely locally on your Mac:
 
-Now add your secrets. Wrangler will prompt you to paste each one:
+1. **Install Ollama** (if you don't already have it):
+   ```bash
+   brew install ollama
+   ollama serve
+   ```
+2. **Pull a vision-capable model**:
+   ```bash
+   ollama pull llava
+   ```
+3. **Verify Settings in `mikey/Info.plist`**:
+   - `MikeyLLMProvider`: `ollama`
+   - `MikeyOllamaModel`: `llava`
+   - `MikeyTTSProvider`: `local`
+   - `VoiceTranscriptionProvider`: `apple`
+4. **Open in Xcode and Run**:
+   ```bash
+   open mikey.xcodeproj
+   ```
+   Select your development signing team, build with **Cmd + R**, and grant requested permissions.
 
-```bash
-npx wrangler secret put ANTHROPIC_API_KEY
-npx wrangler secret put ASSEMBLYAI_API_KEY
-npx wrangler secret put ELEVENLABS_API_KEY
-```
+---
 
-For the ElevenLabs voice ID, open `wrangler.toml` and set it there (it's not sensitive):
+### Cloud Mode (Anthropic Claude + ElevenLabs + AssemblyAI)
 
-```toml
-[vars]
-ELEVENLABS_VOICE_ID = "your-voice-id-here"
-```
+For production-grade cloud intelligence, Mikey routes external API calls through a secure Cloudflare Worker proxy so API keys are never packaged inside the client binary:
 
-Deploy it:
+1. **Deploy the Worker**:
+   ```bash
+   cd worker
+   npm install
+   npx wrangler secret put ANTHROPIC_API_KEY
+   npx wrangler secret put ASSEMBLYAI_API_KEY
+   npx wrangler secret put ELEVENLABS_API_KEY
+   npx wrangler deploy
+   ```
+2. **Configure App**:
+   In `mikey/Info.plist`, set:
+   - `WorkerBaseURL`: `https://your-worker-subdomain.workers.dev`
+   - `MikeyLLMProvider`: `anthropic`
+   - `MikeyTTSProvider`: `elevenlabs`
+   - `VoiceTranscriptionProvider`: `assemblyai`
 
-```bash
-npx wrangler deploy
-```
+---
 
-It'll give you a URL like `https://your-worker-name.your-subdomain.workers.dev`. Copy that.
+## Configuration Reference (`mikey/Info.plist`)
 
-### 2. Run the Worker locally (for development)
+| Key | Options / Type | Default | Description |
+|---|---|---|---|
+| `MikeyLLMProvider` | `ollama` \| `anthropic` | `ollama` | Active LLM backend provider |
+| `MikeyOllamaURL` | URL String | `http://localhost:11434` | Base endpoint for local Ollama |
+| `MikeyOllamaModel` | Model Identifier | `llava` | Ollama model name |
+| `MikeyTTSProvider` | `local` \| `elevenlabs` | `local` | Active text-to-speech audio synthesis |
+| `VoiceTranscriptionProvider` | `apple` \| `assemblyai` \| `openai` | `apple` | Speech transcription engine |
+| `WorkerBaseURL` | URL String | `https://...` | Cloudflare Worker endpoint for cloud mode |
+| `MikeyAuthToken` | String | *(optional)* | Shared secret Bearer token for worker proxy auth |
 
-If you want to test changes to the Worker without deploying:
+---
 
-```bash
-cd worker
-npx wrangler dev
-```
+## Repository & Branching Structure
 
-This starts a local server (usually `http://localhost:8787`) that behaves exactly like the deployed Worker. You'll need to create a `.dev.vars` file in the `worker/` directory with your keys:
+This repository follows a clean, professional git flow with designated branches:
 
-```
-ANTHROPIC_API_KEY=sk-ant-...
-ASSEMBLYAI_API_KEY=...
-ELEVENLABS_API_KEY=...
-ELEVENLABS_VOICE_ID=...
-```
+- **`main`**: Production-ready, fully integrated release branch.
+- **`develop`**: Integration and staging branch for ongoing development.
+- **`feature/modular-providers`**: Pluggable protocol abstractions (`MikeyLLMProvider`, `MikeyTTSProvider`, Ollama integration, local macOS TTS, worker bearer token auth).
+- **`feature/permission-service`**: Centralized `MikeyPermissionService` with intelligent macOS TCC cache fallback and screen content validation.
+- **`feature/branding-and-cleanup`**: Project renaming, bundle identifier unification (`com.mikey.app`), menu bar icon integration, test suite migration (`mikeyTests`), and analytics stubbing.
 
-Then update the proxy URLs in the Swift code to point to `http://localhost:8787` instead of the deployed Worker URL while developing. Grep for `clicky-proxy` to find them all.
+---
 
-### 3. Update the proxy URLs in the app
+## Permissions Guide
 
-The app has the Worker URL hardcoded in a few places. Search for `your-worker-name.your-subdomain.workers.dev` and replace it with your Worker URL:
+Mikey requires four system permissions on macOS:
+1. **Microphone**: Captured via `AVAudioEngine` exclusively while `Ctrl + Option` is held.
+2. **Accessibility**: Monitors global modifier state via a passive, listen-only `CGEvent` tap.
+3. **Screen Recording**: Captures the active display when push-to-talk completes.
+4. **Screen Content**: Granted via ScreenCaptureKit for non-intrusive window/screen analysis.
 
-```bash
-grep -r "clicky-proxy" leanring-buddy/
-```
+---
 
-You'll find it in:
-- `CompanionManager.swift` — Claude chat + ElevenLabs TTS
-- `AssemblyAIStreamingTranscriptionProvider.swift` — AssemblyAI token endpoint
+## Attribution & License
 
-### 4. Open in Xcode and run
-
-```bash
-open leanring-buddy.xcodeproj
-```
-
-In Xcode:
-1. Select the `leanring-buddy` scheme (yes, the typo is intentional, long story)
-2. Set your signing team under Signing & Capabilities
-3. Hit **Cmd + R** to build and run
-
-The app will appear in your menu bar (not the dock). Click the icon to open the panel, grant the permissions it asks for, and you're good.
-
-### Permissions the app needs
-
-- **Microphone** — for push-to-talk voice capture
-- **Accessibility** — for the global keyboard shortcut (Control + Option)
-- **Screen Recording** — for taking screenshots when you use the hotkey
-- **Screen Content** — for ScreenCaptureKit access
-
-## Architecture
-
-If you want the full technical breakdown, read `CLAUDE.md`. But here's the short version:
-
-**Menu bar app** (no dock icon) with two `NSPanel` windows — one for the control panel dropdown, one for the full-screen transparent cursor overlay. Push-to-talk streams audio over a websocket to AssemblyAI, sends the transcript + screenshot to Claude via streaming SSE, and plays the response through ElevenLabs TTS. Claude can embed `[POINT:x,y:label:screenN]` tags in its responses to make the cursor fly to specific UI elements across multiple monitors. All three APIs are proxied through a Cloudflare Worker.
-
-## Project structure
-
-```
-leanring-buddy/          # Swift source (yes, the typo stays)
-  CompanionManager.swift    # Central state machine
-  CompanionPanelView.swift  # Menu bar panel UI
-  ClaudeAPI.swift           # Claude streaming client
-  ElevenLabsTTSClient.swift # Text-to-speech playback
-  OverlayWindow.swift       # Blue cursor overlay
-  AssemblyAI*.swift         # Real-time transcription
-  BuddyDictation*.swift     # Push-to-talk pipeline
-worker/                  # Cloudflare Worker proxy
-  src/index.ts              # Three routes: /chat, /tts, /transcribe-token
-CLAUDE.md                # Full architecture doc (agents read this)
-```
-
-## Contributing
-
-PRs welcome. If you're using Claude Code, it already knows the codebase — just tell it what you want to build and point it at `CLAUDE.md`.
-
-Got feedback? DM me on X [@farzatv](https://x.com/farzatv).
+- Forked from [Clicky](https://github.com/farzaa/clicky) by **Farza Majeed**.
+- Licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
